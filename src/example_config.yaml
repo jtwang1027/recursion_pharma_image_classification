@@ -1,0 +1,31 @@
+model: vit # vit_b_16
+# model: densenet121
+num_epochs: 30
+num_categories: 5
+learning_rate: 1e-4
+training_batch_size:  32
+test_batch_size:  32
+loss_ce_weight:  0.9 # cross-entropy weighting (vs metric loss)
+resize_img_dim: 384 # resize images to this dimension
+data_augmentation: # used for training only
+- vertical # flip
+- horizontal # flip
+- crop:224 # 384x384
+- rotate
+- cutmix
+# wandb: #wandb.init kwargs
+#   project: 'rxrx1_test'
+#   name: 'densenet121'
+
+images_dir: '/Users/jasonwang/github/recursion/rxrx1/images' # parent directory to cell_line/plate_/*.png
+metadata_path: '/Users/jasonwang/github/recursion/metadata.csv' # contains sirna_id and site_id
+save_dir: './model1_checkpoints/'
+
+scheduler: # Optional
+  # load any scheduler in torch.optim.lr_scheduler by name
+  # https://pytorch.org/docs/stable/optim.html
+  # CosineAnnealingWarmRestarts, LinearLR, ExponentialLR, etc
+  type: CosineAnnealingWarmRestarts
+  # add kwargs for any additional scheduler kwargs (except optimizer)
+  kwargs:
+    T_0: 10
