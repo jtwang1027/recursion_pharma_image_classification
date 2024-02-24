@@ -21,10 +21,23 @@ logger = logging.getLogger(__name__)
 
 
 # local
-from .dataset import Rxrx1, make_transform_pipeline
-from .config import Config
-from .models import CustomDensenet, CustomVit
-from .losses import ArcFaceLoss, calc_accuracy
+# from .dataset import Rxrx1, make_transform_pipeline
+# from .config import Config
+# from .models import CustomDensenet, CustomVit
+# from .losses import ArcFaceLoss, calc_accuracy
+
+
+from dataset import Rxrx1, make_transform_pipeline
+from config import Config
+from models import CustomDensenet, CustomVit
+from losses import ArcFaceLoss, calc_accuracy
+
+
+# from src.dataset import Rxrx1, make_transform_pipeline
+# from src.config import Config
+# from src.models import CustomDensenet, CustomVit
+# from src.losses import ArcFaceLoss, calc_accuracy
+
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else torch.device("cpu"))
 
