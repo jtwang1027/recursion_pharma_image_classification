@@ -55,7 +55,7 @@ DEFAULT_TRANSFORM = make_transform_pipeline(
 class Rxrx1(Dataset):
     def __init__(
         self,
-        images_dir="/kaggle/input/recursion-cellular-image-classification/train/",
+        images_dir="/kaggle/input/recursion-cellular-image-classification/",
         metadata_path="/kaggle/input/rxrx1-metadata-csv/metadata.csv",  # downloaded from https://www.rxrx.ai/rxrx1 : Metadata
         split="train",
         num_categories=10,
@@ -82,7 +82,7 @@ class Rxrx1(Dataset):
         meta = meta.reset_index(drop=True)
         self.num_categories = num_categories
         self.meta = meta
-        self.images_dir = Path(images_dir)
+        self.images_dir = Path(images_dir) / split
 
         self.transform = data_transform
 
