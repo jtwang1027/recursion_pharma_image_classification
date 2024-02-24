@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 import torchvision
-from losses import ArcMarginProduct
+from .losses import ArcMarginProduct
 from torch.nn import functional as F
 
 
