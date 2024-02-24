@@ -6,7 +6,7 @@ from PIL import Image
 from pathlib import Path
 from torchvision import transforms
 from PIL import Image
-from typing import Optional
+from typing import Optional, Literal
 
 
 def make_transform_pipeline(
@@ -62,6 +62,8 @@ class Rxrx1(Dataset):
         data_transform=DEFAULT_TRANSFORM,
     ):
 
+        self._set_images_dir(images_dir, split)
+
         meta = pd.read_csv(metadata_path)
         meta["sirna"] = meta["sirna"].astype(
             "category"
@@ -83,12 +85,22 @@ class Rxrx1(Dataset):
         self.num_categories = num_categories
         self.meta = meta
 
-        if split in images_dir:
-            self.images_dir = Path(images_dir)
-        else:
-            self.images_dir = Path(images_dir) / split
-
         self.transform = data_transform
+
+    def _set_images_dir(self, images_dir, split: Literal["train", "test"]):
+        """
+        Sets images_dir to type pathlib.Path.
+        It also addresses 2 file tree formats for the images dir.
+        - On kaggle, it's images_dir/train -> so data split is appended here
+        - Direct rxr1 download, all images are directly in images_dir/*
+        """
+        if isinstance(images_dir, str):
+            images_dir = Path(images_dir)
+
+        if "kaggle" in str(images_dir):
+            self.images_dir = images_dir / split
+        else:
+            self.images_dir = images_dir
 
     def _get_all_channel_paths(self, row: pd.Series) -> list:
         """Assemble paths for all 6 channels from metadata row"""
