@@ -82,7 +82,11 @@ class Rxrx1(Dataset):
         meta = meta.reset_index(drop=True)
         self.num_categories = num_categories
         self.meta = meta
-        self.images_dir = Path(images_dir) / split
+
+        if split in images_dir:
+            self.images_dir = Path(images_dir)
+        else:
+            self.images_dir = Path(images_dir) / split
 
         self.transform = data_transform
 
