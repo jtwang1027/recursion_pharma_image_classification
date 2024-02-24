@@ -11,7 +11,6 @@ import yaml
 from typing import Optional
 from pathlib import Path
 import torch
-from dataset import make_transform_pipeline
 
 
 class Config(BaseModel):
@@ -29,6 +28,7 @@ class Config(BaseModel):
         ["vertical", "horizontal", "rotate", "cutmix", "crop:224"],
     )
     wandb: Optional[dict] = None
+    arcface_loss: dict = {"s": 30, "m": 0.5}
     save_dir: str = "./model1_checkpoints/"
     scheduler: Optional[dict] = None
 

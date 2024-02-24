@@ -1,28 +1,20 @@
-from config import Config
+from .config import Config
 import torch
 from torch import nn
-import numpy as np  # linear algebra
-import pandas as pd  # data processing, CSV file I/O (e.g. pd.read_csv)
+import numpy as np
+import pandas as pd
 from pathlib import Path
 import torch
 from pathlib import Path
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-
 import torch.optim as optim
 import wandb
 from torchvision.transforms import v2
-
-# from torchvision.models import vit_b_16, vit_b_32, VisionTransformer
-from torch.utils.data.dataloader import default_collate
 from functools import partial
 import dill as pickle  # needed for collate_fn
 import torch.nn.functional as F
-from torchvision import transforms
-
-
 import argparse
-
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -136,7 +128,7 @@ def train(config: Config):
     model.train()
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
-    metric_loss = ArcFaceLoss()
+    metric_loss = ArcFaceLoss(**config.arcface_loss)
     ce_loss = nn.CrossEntropyLoss()
 
     if config.use_scheduler:

@@ -21,21 +21,14 @@ class ArcMarginProduct(nn.Module):
         return cosine
 
 
-class DenseCrossEntropy(nn.Module):
-    def forward(self, x, target):
-        x = x.float()
-        target = target.float()
-        logprobs = torch.nn.functional.log_softmax(x, dim=-1)
-
-        loss = -logprobs * target
-        loss = loss.sum(-1)
-        return loss.mean()
-
-
 class ArcFaceLoss(nn.modules.Module):
     def __init__(self, s=30.0, m=0.5):
+        """
+        s: feature scale, hypersphere radius
+        m: angular margin penalty
+        """
         super().__init__()
-        self.crit = DenseCrossEntropy()
+        self.crit = nn.CrossEntropyLoss()
         self.s = s
         self.cos_m = math.cos(m)
         self.sin_m = math.sin(m)
