@@ -62,6 +62,20 @@ def cutmix_collate_fn(batch_list: list, num_categories: int):
     return x_stack, cell_type_stack, label_stack
 
 
+@torch.no_grad
+def eval(model, test_dataloader):
+    """Evaluate model on entire test set."""
+    all_predictions = []
+    all_labels = []
+
+    for x, cell_type, labels in test_dataloader:
+        _, cftn_pred = model(x, cell_type)
+        all_predictions.append(cftn_pred)
+        all_labels.append(labels)
+
+    return calc_accuracy(torch.cat(all_labels), torch.cat(all_predictions))
+
+
 def train(config: Config):
     training_batch_size = config.training_batch_size
     test_batch_size = config.test_batch_size
@@ -71,7 +85,6 @@ def train(config: Config):
     use_wandb = config.use_wandb
     use_cutmix = config.use_cutmix
     loss_ce_weight = config.loss_ce_weight
-    save_dir = Path(".")
 
     if use_cutmix:
         train_collate_fn = partial(cutmix_collate_fn, num_categories=num_categories)
@@ -166,7 +179,7 @@ def train(config: Config):
 
             wandb_log_info = {
                 "loss": loss.item(),
-                "ce_loss": _ce_loss.item(),
+                "train_ce_loss": _ce_loss.item(),
                 "metric_loss": _metric_loss.item(),
                 # 'train_accuracy':train_accuracy,
             }
@@ -185,7 +198,7 @@ def train(config: Config):
                 )
 
                 with torch.no_grad():
-                    test_ce_loss, test_cftn = model(test_x, test_cell_type)
+                    _, test_cftn = model(test_x, test_cell_type)
                     test_accuracy = calc_accuracy(test_cftn, test_labels)
                     test_ce_loss = ce_loss(test_cftn, test_labels)
 
@@ -207,8 +220,15 @@ def train(config: Config):
 
         torch.save(model.state_dict(), config.save_dir / f"{epoch}.pt")
 
+    logger.info("Training completed.")
+    test_set_accuracy = eval(model, test_dataloader)
+
     if use_wandb:
+        logger.info("Running eval on entire test set.")
+        wandb.run.summary["test_accuracy"] = test_set_accuracy
         wandb.finish()
+    else:
+        logger.info(f"full test set accuracy: {test_set_accuracy}")
 
     return
 

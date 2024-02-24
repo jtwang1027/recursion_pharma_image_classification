@@ -1,7 +1,7 @@
 model: vit # vit_b_16
 # model: densenet121
-num_epochs: 30
-num_categories: 5
+num_epochs: 1
+num_categories: 1
 learning_rate: 1e-4
 training_batch_size:  32
 test_batch_size:  32
