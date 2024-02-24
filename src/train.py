@@ -79,6 +79,7 @@ def train(config: Config):
         train_collate_fn = None
 
     # setup train/test datasets/dataloaders
+    logger.info("Setting up train/test dataloaders.")
     train_dataset = Rxrx1(
         images_dir=config.images_dir,
         metadata_path=config.metadata_path,
@@ -117,10 +118,10 @@ def train(config: Config):
         wandb.init(
             project=config.wandb["project"],
             name=config.wandb["name"],
-            config=config.model_dump_json(),
+            config=dict(config),
         )
 
-    # load model, optimizers, losses, schedulers
+    logger.info("Loading model.")
     model = load_model(
         config.model, num_categories=num_categories, image_size=config.resize_img_dim
     )
@@ -136,7 +137,7 @@ def train(config: Config):
             optimizer, **config.scheduler["kwargs"]
         )
 
-    # Start training
+    logger.info("Starting training.")
     for epoch in range(num_epochs):
         logger.info(f"Epoch {epoch}")
 
