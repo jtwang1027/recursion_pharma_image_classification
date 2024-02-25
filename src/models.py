@@ -4,8 +4,9 @@ import torchvision
 from torch.nn import functional as F
 
 
-# from .losses import ArcMarginProduct
-from losses import ArcMarginProduct
+from .losses import ArcMarginProduct
+
+# from losses import ArcMarginProduct
 
 
 class CustomVit(nn.Module):
