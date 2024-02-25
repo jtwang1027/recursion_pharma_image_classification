@@ -78,16 +78,24 @@ def cutmix_collate_fn(batch_list: list, num_categories: int):
 @torch.no_grad
 def eval(model, test_dataloader):
     """Evaluate model on entire test set."""
-    all_predictions = []
+    all_cftn_predictions = []
+    all_metric_head_predictions = []
     all_labels = []
 
     for x, cell_type, labels in test_dataloader:
         x, cell_type, labels = x.to(device), cell_type.to(device), labels.to(device)
-        _, cftn_pred = model(x, cell_type)
-        all_predictions.append(cftn_pred)
+        metric_pred, cftn_pred = model(x, cell_type)
+        all_cftn_predictions.append(cftn_pred)
+        all_metric_head_predictions.append(metric_pred)
         all_labels.append(labels)
 
-    return calc_accuracy(torch.cat(all_predictions), torch.cat(all_labels))
+    labels_tensor = torch.cat(all_labels)
+    cftn_head_accuracy = calc_accuracy(torch.cat(all_cftn_predictions), labels_tensor)
+    metric_head_accuracy = calc_accuracy(
+        torch.cat(all_metric_head_predictions), labels_tensor
+    )
+
+    return metric_head_accuracy, cftn_head_accuracy
 
 
 def train(config: Config):
@@ -124,21 +132,24 @@ def train(config: Config):
         collate_fn=train_collate_fn,
     )
 
-    test_dataloader = iter(
-        DataLoader(
-            Rxrx1(
-                images_dir=config.images_dir,
-                metadata_path=config.metadata_path,
-                split="test",
-                num_categories=num_categories,
-                data_transform=make_transform_pipeline(
-                    resize_dim=config.resize_img_dim
-                ),
-            ),  # for test set: just resize, don't transform
-            batch_size=test_batch_size,
-            shuffle=False,
-            num_workers=1,
-        )
+    # use a single batch for test set
+    test_dataloader = DataLoader(
+        Rxrx1(
+            images_dir=config.images_dir,
+            metadata_path=config.metadata_path,
+            split="test",
+            num_categories=num_categories,
+            data_transform=make_transform_pipeline(resize_dim=config.resize_img_dim),
+        ),  # for test set: just resize, don't augment
+        batch_size=test_batch_size,
+        shuffle=False,
+        num_workers=1,
+    )
+    test_x, test_cell_type, test_labels = next(iter(test_dataloader))
+    test_x, test_cell_type, test_labels = (
+        test_x.to(device),
+        test_cell_type.to(device),
+        test_labels.to(device),
     )
 
     if config.use_wandb:
@@ -204,22 +215,19 @@ def train(config: Config):
 
             # EVAL
             if batch_num % 50 == 0:
-                test_x, test_cell_type, test_labels = next(test_dataloader)
-                test_x, test_cell_type, test_labels = (
-                    test_x.to(device),
-                    test_cell_type.to(device),
-                    test_labels.to(device),
-                )
-
                 with torch.no_grad():
-                    _, test_cftn = model(test_x, test_cell_type)
+                    test_metric, test_cftn = model(test_x, test_cell_type)
                     test_accuracy = calc_accuracy(test_cftn, test_labels)
+                    test_metric_accuracy = calc_accuracy(
+                        test_metric, test_labels
+                    )  # from metric loss head
                     test_ce_loss = ce_loss(test_cftn, test_labels)
 
                 wandb_log_info.update(
                     {
                         # test set
                         "test_accuracy": test_accuracy,
+                        "test_accuracy:metric_head": test_metric_accuracy,
                         "test_ce_loss": test_ce_loss.item(),
                     }
                 )
@@ -235,14 +243,18 @@ def train(config: Config):
         torch.save(model.state_dict(), config.save_dir / f"{epoch}.pt")
 
     logger.info("Training completed.")
-    test_set_accuracy = eval(model, test_dataloader)
+    metric_head_accuracy, cftn_head_accuracy = eval(model, test_dataloader)
 
     if use_wandb:
         logger.info("Running eval on entire test set.")
-        wandb.run.summary["test_accuracy"] = test_set_accuracy
+        wandb.run.summary["test_accuracy:cftn_head"] = cftn_head_accuracy
+        wandb.run.summary["test_accuracy:metric_head"] = metric_head_accuracy
         wandb.finish()
     else:
-        logger.info(f"full test set accuracy: {test_set_accuracy}")
+        logger.info(f"full test set accuracy (ce loss head): {cftn_head_accuracy}")
+        logger.info(
+            f"full test set accuracy (metric loss head): {metric_head_accuracy}"
+        )
 
     return
 
