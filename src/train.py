@@ -171,7 +171,7 @@ def train(config: Config):
     ce_loss = nn.CrossEntropyLoss()
 
     if config.use_scheduler:
-        scheduler = getattr(torch.optim.lr_scheduler, config.scheduler["type"]).value(
+        scheduler = getattr(torch.optim.lr_scheduler, config.scheduler["type"])(
             optimizer, **config.scheduler["kwargs"]
         )
 

@@ -109,6 +109,7 @@ class Config(BaseModel):
         assert (
             "kwargs" in v
         ), "scheduler should have the key: kwargs, needed to init scheduler"
+        return v
 
     @validator("wandb")
     def validate_wandb(cls, v):
