@@ -139,7 +139,9 @@ def train(config: Config):
             metadata_path=config.metadata_path,
             split="test",
             num_categories=num_categories,
-            data_transform=make_transform_pipeline(resize_dim=config.resize_img_dim),
+            data_transform=make_transform_pipeline(
+                resize_dim=config.resize_img_dim, transform_list=[]
+            ),
         ),  # for test set: just resize, don't augment
         batch_size=test_batch_size,
         shuffle=False,
