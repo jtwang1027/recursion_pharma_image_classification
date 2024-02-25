@@ -82,6 +82,7 @@ def eval(model, test_dataloader):
     all_labels = []
 
     for x, cell_type, labels in test_dataloader:
+        x, cell_type, labels = x.to(device), cell_type.to(device), labels.to(device)
         _, cftn_pred = model(x, cell_type)
         all_predictions.append(cftn_pred)
         all_labels.append(labels)
