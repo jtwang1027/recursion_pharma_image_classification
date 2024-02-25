@@ -87,7 +87,7 @@ def eval(model, test_dataloader):
         all_predictions.append(cftn_pred)
         all_labels.append(labels)
 
-    return calc_accuracy(torch.cat(all_labels), torch.cat(all_predictions))
+    return calc_accuracy(torch.cat(all_predictions), torch.cat(all_labels))
 
 
 def train(config: Config):
