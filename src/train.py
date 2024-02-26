@@ -15,22 +15,23 @@ import dill as pickle  # needed for collate_fn
 import torch.nn.functional as F
 import argparse
 import logging
+from typing import Literal
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 # local
-from .dataset import Rxrx1, make_transform_pipeline
-from .config import Config
-from .models import CustomDensenet, CustomVit
-from .losses import ArcFaceLoss, calc_accuracy
+# from .dataset import Rxrx1, make_transform_pipeline
+# from .config import Config
+# from .models import CustomDensenet, CustomVit
+# from .losses import ArcFaceLoss, calc_accuracy
 
 
-# from dataset import Rxrx1, make_transform_pipeline
-# from config import Config
-# from models import CustomDensenet, CustomVit
-# from losses import ArcFaceLoss, calc_accuracy
+from dataset import Rxrx1, make_transform_pipeline
+from config import Config
+from models import CustomDensenet, CustomVit
+from losses import ArcFaceLoss, calc_accuracy
 
 
 # from src.dataset import Rxrx1, make_transform_pipeline
@@ -98,55 +99,54 @@ def eval(model, test_dataloader):
     return metric_head_accuracy, cftn_head_accuracy
 
 
+def setup_dataloader(config: Config, split: Literal["train", "test"]):
+
+    if config.use_cutmix and split == "train":
+        collate_fn = partial(cutmix_collate_fn, num_categories=config.num_categories)
+    else:
+        collate_fn = None
+
+    if split == "train":
+        transform_pipeline = make_transform_pipeline(
+            resize_dim=config.resize_img_dim, transform_list=config.data_augmentation
+        )
+    else:  # `test` split
+        transform_pipeline = make_transform_pipeline(
+            resize_dim=config.resize_img_dim, transform_list=[]
+        )
+
+    # setup train/test datasets/dataloaders
+    logger.info(f"Setting up {split} dataloaders.")
+    rxrx1_dataset = Rxrx1(
+        images_dir=config.images_dir,
+        metadata_path=config.metadata_path,
+        split="train",
+        num_categories=config.num_categories,
+        data_transform=transform_pipeline,
+    )
+
+    rxrx1_dataloader = DataLoader(
+        rxrx1_dataset,
+        batch_size=getattr(config, f"{split}_batch_size"),
+        shuffle=True,
+        num_workers=1,
+        collate_fn=collate_fn,
+    )
+    return rxrx1_dataset, rxrx1_dataloader
+
+
 def train(config: Config):
-    training_batch_size = config.training_batch_size
-    test_batch_size = config.test_batch_size
     learning_rate = config.learning_rate
     num_categories = config.num_categories
     num_epochs = config.num_epochs
     use_wandb = config.use_wandb
-    use_cutmix = config.use_cutmix
     loss_ce_weight = config.loss_ce_weight
 
-    if use_cutmix:
-        train_collate_fn = partial(cutmix_collate_fn, num_categories=num_categories)
-    else:
-        train_collate_fn = None
-
     # setup train/test datasets/dataloaders
-    logger.info("Setting up train/test dataloaders.")
-    train_dataset = Rxrx1(
-        images_dir=config.images_dir,
-        metadata_path=config.metadata_path,
-        split="train",
-        num_categories=num_categories,
-        data_transform=make_transform_pipeline(
-            resize_dim=config.resize_img_dim, transform_list=config.data_augmentation
-        ),
-    )
-    train_dataloader = DataLoader(
-        train_dataset,
-        batch_size=training_batch_size,
-        shuffle=True,
-        num_workers=1,
-        collate_fn=train_collate_fn,
-    )
+    _, train_dataloader = setup_dataloader(config, "train")
+    _, test_dataloader = setup_dataloader(config, "test")
 
     # use a single batch for test set
-    test_dataloader = DataLoader(
-        Rxrx1(
-            images_dir=config.images_dir,
-            metadata_path=config.metadata_path,
-            split="test",
-            num_categories=num_categories,
-            data_transform=make_transform_pipeline(
-                resize_dim=config.resize_img_dim, transform_list=[]
-            ),
-        ),  # for test set: just resize, don't augment
-        batch_size=test_batch_size,
-        shuffle=False,
-        num_workers=1,
-    )
     test_x, test_cell_type, test_labels = next(iter(test_dataloader))
     test_x, test_cell_type, test_labels = (
         test_x.to(device),
@@ -249,8 +249,8 @@ def train(config: Config):
 
     if use_wandb:
         logger.info("Running eval on entire test set.")
-        wandb.run.summary["test_accuracy:cftn_head"] = cftn_head_accuracy
-        wandb.run.summary["test_accuracy:metric_head"] = metric_head_accuracy
+        wandb.run.summary["full_test_accuracy:cftn_head"] = cftn_head_accuracy
+        wandb.run.summary["full_test_accuracy:metric_head"] = metric_head_accuracy
         wandb.finish()
     else:
         logger.info(f"full test set accuracy (ce loss head): {cftn_head_accuracy}")

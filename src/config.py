@@ -19,7 +19,7 @@ class Config(BaseModel):
     model: str = "densenet121"
     num_epochs: int = 2
     learning_rate: float = 1e-4
-    training_batch_size: int = 32
+    train_batch_size: int = 32
     test_batch_size: int = 12
     loss_ce_weight: float = 0.8
     num_categories: int = 15
@@ -95,9 +95,7 @@ class Config(BaseModel):
             return
 
         try:
-            getattr(
-                torch.optim.lr_scheduler, v["type"]
-            )  # .value(optimizer, **config.scheduler['kwargs'])
+            getattr(torch.optim.lr_scheduler, v["type"])
         except Exception as e:
             raise ValueError(
                 f"Failed to import valid scheduler: {v['type']} from torch.optim.lr_scheduler"

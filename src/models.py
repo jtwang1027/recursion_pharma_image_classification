@@ -4,9 +4,9 @@ import torchvision
 from torch.nn import functional as F
 
 
-from .losses import ArcMarginProduct
+# from .losses import ArcMarginProduct
 
-# from losses import ArcMarginProduct
+from losses import ArcMarginProduct
 
 
 class CustomVit(nn.Module):
@@ -21,7 +21,7 @@ class CustomVit(nn.Module):
         # cell type expected to have 4 classes,
         # kwargs get passed to construct pretrained model
         """
-        Uses ViT_B_16 (patch_size 16):
+        Uses ViT_B_16 (default: image_size:224, patch_size 16):
             patch_size: 16,
             num_layers:12,
             num_heads: 12,
@@ -31,9 +31,11 @@ class CustomVit(nn.Module):
         """
 
         super().__init__()
-        pretrained_backbone = getattr(torchvision.models, backbone)(
-            pretrained=True, **kwargs
-        )
+        model_fn = getattr(torchvision.models, backbone)
+        if image_size == 224 or image_size is None:
+            pretrained_backbone = model_fn(pretrained=True, **kwargs)
+        else:
+            pretrained_backbone = model_fn(image_size=image_size, **kwargs)
 
         self.hidden_dim = pretrained_backbone.hidden_dim  # 768 for vit_b_16
         self.patch_size = pretrained_backbone.patch_size
@@ -70,6 +72,7 @@ class CustomVit(nn.Module):
         )  # attention needs: batches, flattened patches, patches_embedding (aka hidden_dim)
         x = torch.cat([self.class_token.expand(n, -1, -1), x], dim=1)
 
+        # bs, 197, hidden_dim
         x = self.encoder(x)[:, 0]
         if self.cell_embedding_dim > 0:
             x = torch.cat([x, self.cell_embedding(s).squeeze(1)], dim=1)
