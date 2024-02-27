@@ -1,16 +1,24 @@
 model:
-  type: densenet121
+  type: vit
+  kwargs:
+    patch_size: 16
+    num_layers: 12
+    num_heads: 12
+    hidden_dim: 768
+    mlp_dim: 3072
 num_epochs: 1
 num_categories: 2
 learning_rate: 1e-4
 train_batch_size:  32
 test_batch_size:  32
-# resize_img_dim: 240 # resize images to this dimension
+# resize_img_dim: 384 # resize images to this dimension
+resize_img_dim: 240 # resize images to this dimension
 data_augmentation: # used for training only
 - vertical # flip
 - horizontal # flip
 - rotate
 - cutmix
+
 cell_embedding_dim: 12
 loss_ce_weight:  0.9 # cross-entropy weighting (vs metric loss)
 arcface_loss:
@@ -22,8 +30,10 @@ arcface_loss:
 images_dir: 'rxrx1/images' # parent directory to cell_line/plate_/*.png
 metadata_path: 'metadata.csv' # contains sirna_id and site_id
 save_dir: './model1_checkpoints/'
+
 # load any scheduler in torch.optim.lr_scheduler by name
-# https://pytorch.org/docs/stable/optim.html , CosineAnnealingWarmRestarts, LinearLR, ExponentialLR, etc
+# https://pytorch.org/docs/stable/optim.html
+# CosineAnnealingWarmRestarts, LinearLR, ExponentialLR, etc
 # add kwargs for any additional scheduler kwargs (except optimizer)
 # scheduler:
 #   type: CosineAnnealingWarmRestarts

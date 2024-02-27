@@ -2,25 +2,23 @@ import torch
 from torch import nn
 import torchvision
 from torch.nn import functional as F
-from typing import Literal
+from typing import Literal, Optional
 
-
-# from .losses import ArcMarginProduct
 
 from losses import ArcMarginProduct
+from torchvision.models import VisionTransformer
 
 
 class CustomVit(nn.Module):
     def __init__(
         self,
-        backbone="vit_b_16",
+        backbone: Optional[Literal["vit_b_16"]] = "vit_b_16",
         image_size: int = 224,
         num_classes: int = 15,
         cell_embedding_dim: int = 12,
         **kwargs,
     ):
         # cell type expected to have 4 classes,
-        # kwargs get passed to construct pretrained model
         """
         Uses ViT_B_16 (default: image_size:224, patch_size 16):
             patch_size: 16,
@@ -33,14 +31,20 @@ class CustomVit(nn.Module):
         """
 
         super().__init__()
-        model_fn = getattr(torchvision.models, backbone)
-        if image_size == 224 or image_size is None:
-            pretrained_backbone = model_fn(pretrained=True, **kwargs)
-        else:
-            pretrained_backbone = model_fn(image_size=image_size, **kwargs)
 
-        self.hidden_dim = pretrained_backbone.hidden_dim  # 768 for vit_b_16
-        self.patch_size = pretrained_backbone.patch_size
+        if backbone is None:
+            model_backbone = VisionTransformer(
+                image_size=image_size, num_classes=num_classes, **kwargs
+            )
+        else:
+            model_fn = getattr(torchvision.models, backbone)
+            if image_size == 224 or image_size is None:
+                model_backbone = model_fn(pretrained=True, **kwargs)
+            else:
+                model_backbone = model_fn(image_size=image_size, **kwargs)
+
+        self.hidden_dim = model_backbone.hidden_dim  # 768 for vit_b_16
+        self.patch_size = model_backbone.patch_size
 
         assert (
             image_size % self.patch_size == 0
@@ -52,7 +56,7 @@ class CustomVit(nn.Module):
         self.conv_proj = nn.Conv2d(
             6, self.hidden_dim, kernel_size=self.patch_size, stride=self.patch_size
         )
-        self.encoder = pretrained_backbone.encoder
+        self.encoder = model_backbone.encoder
         self.heads = nn.Linear(self.hidden_dim + cell_embedding_dim, self.num_classes)
         self.cell_embedding_dim = cell_embedding_dim
         if cell_embedding_dim > 0:

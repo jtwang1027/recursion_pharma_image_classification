@@ -16,7 +16,7 @@ import torch
 class Config(BaseModel):
     metadata_path: FilePath  # downloaded from https://www.rxrx.ai/rxrx1 : Metadata
     images_dir: DirectoryPath
-    model: str = "densenet121"
+    model: dict = {"type": "densenet121"}
     num_epochs: int = 2
     learning_rate: float = 1e-4
     train_batch_size: int = 32
@@ -24,6 +24,7 @@ class Config(BaseModel):
     loss_ce_weight: float = 0.8
     num_categories: int = 15
     resize_img_dim: int = 224
+    cell_embedding_dim: int = 12
     data_augmentation: list[str] = (
         ["vertical", "horizontal", "rotate", "cutmix", "crop:224"],
     )
@@ -49,14 +50,36 @@ class Config(BaseModel):
 
     @validator("model")
     def check_model_type(cls, v):
-        v = v.lower()
-        if v.startswith("densenet"):
-            assert v in ["densenet121", "densenet169", "densenet201", "densenet161"]
-            return v
-        elif v.lower() == "vit":
-            return v
-        else:
-            raise ValueError(f"unexpected model type:{v}")
+        """
+        `model` in config.yml should look something like:
+        model:
+            type: denset161 or vit_b_16
+
+        If custom vit is desired, kwargs is needed:
+        model:
+            type: vit
+            kwargs:
+                image_size: 224
+                patch_size: 16
+                num_heads: 4
+                num_layers: 4
+                hidden_dim: 100
+                mlp_dim: 1028
+        """
+        model_type = v["type"].lower()
+        if model_type.startswith("densenet"):
+            assert model_type in [
+                "densenet121",
+                "densenet169",
+                "densenet201",
+                "densenet161",
+            ]
+        elif model_type == "vit":
+            assert (
+                "kwargs" in v
+            ), "ViT from scratch requires kwargs to construct pytorch VisionTransformer()"
+
+        return v
 
     @validator("num_categories")
     def check_num_cat(cls, v):

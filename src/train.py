@@ -21,6 +21,8 @@ from dataset import Rxrx1, make_transform_pipeline
 from config import Config
 from models import CustomDensenet, CustomVit
 from losses import ArcFaceLoss, calc_accuracy
+from torchvision.models import VisionTransformer, vit_b_16
+import torchvision
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else torch.device("cpu"))
 
@@ -30,8 +32,9 @@ def load_model(
     num_categories: int = 15,
     cell_embedding_dim: int = 12,
     image_size: int = 224,
+    **kwargs,
 ):
-    """Convenience wrapper to load any model type."""
+    """Convenience wrapper to load any model type. kwargs are used for ViT from scratch."""
 
     if "densenet" in model_type:
         # densenet121, densenet169, densenet201, densenet161
@@ -40,9 +43,20 @@ def load_model(
             num_classes=num_categories,
             cell_embedding_dim=cell_embedding_dim,
         )
-    else:
-        # ViT
+    elif model_type == "vit":
         model = CustomVit(
+            backbone=None,
+            image_size=image_size,
+            num_classes=num_categories,
+            dropout=0.2,
+            cell_embedding_dim=cell_embedding_dim,
+            **kwargs,  # kwargs: patch_size, num_heads, num_layers, hidden_dim, mlp_dim
+        )
+
+    else:
+        # pretrained ViT (vit_b_16)
+        model = CustomVit(
+            backbone=model_type,
             image_size=image_size,
             num_classes=num_categories,
             dropout=0.2,
@@ -150,9 +164,15 @@ def train(config: Config):
         )
 
     print("Loading model.")
-    model = load_model(
-        config.model, num_categories=num_categories, image_size=config.resize_img_dim
-    )
+    _load_model_args = {
+        "model_type": config.model["type"],
+        "num_categories": config.num_categories,
+        "image_size": config.resize_img_dim,
+        "cell_embedding_dim": config.cell_embedding_dim,
+    }
+    if "kwargs" in config.model:
+        _load_model_args.update(config.model["kwargs"])
+    model = load_model(**_load_model_args)
     model = model.to(device)
     model.train()
 
