@@ -25,10 +25,10 @@ arcface_loss:
   s: 30
   m: 0.5
 
-# images_dir: /kaggle/input/recursion-cellular-image-classification/
-# metadata_path: /kaggle/input/rxrx1-metadata-csv/metadata.csv
-images_dir: 'rxrx1/images' # parent directory to cell_line/plate_/*.png
-metadata_path: 'metadata.csv' # contains sirna_id and site_id
+images_dir: /kaggle/input/recursion-cellular-image-classification/
+metadata_path: /kaggle/input/rxrx1-metadata-csv/metadata.csv
+# images_dir: 'rxrx1/images' # parent directory to cell_line/plate_/*.png
+# metadata_path: 'metadata.csv' # contains sirna_id and site_id
 save_dir: './model1_checkpoints/'
 
 # load any scheduler in torch.optim.lr_scheduler by name
