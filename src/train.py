@@ -14,31 +14,13 @@ from functools import partial
 import dill as pickle  # needed for collate_fn
 import torch.nn.functional as F
 import argparse
-import logging
 from typing import Literal
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-
-# local
-# from .dataset import Rxrx1, make_transform_pipeline
-# from .config import Config
-# from .models import CustomDensenet, CustomVit
-# from .losses import ArcFaceLoss, calc_accuracy
 
 
 from dataset import Rxrx1, make_transform_pipeline
 from config import Config
 from models import CustomDensenet, CustomVit
 from losses import ArcFaceLoss, calc_accuracy
-
-
-# from src.dataset import Rxrx1, make_transform_pipeline
-# from src.config import Config
-# from src.models import CustomDensenet, CustomVit
-# from src.losses import ArcFaceLoss, calc_accuracy
-
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else torch.device("cpu"))
 
@@ -116,7 +98,7 @@ def setup_dataloader(config: Config, split: Literal["train", "test"]):
         )
 
     # setup train/test datasets/dataloaders
-    logger.info(f"Setting up {split} dataloaders.")
+    print(f"Setting up {split} dataloaders.")
     rxrx1_dataset = Rxrx1(
         images_dir=config.images_dir,
         metadata_path=config.metadata_path,
@@ -161,7 +143,7 @@ def train(config: Config):
             config=dict(config),
         )
 
-    logger.info("Loading model.")
+    print("Loading model.")
     model = load_model(
         config.model, num_categories=num_categories, image_size=config.resize_img_dim
     )
@@ -177,9 +159,9 @@ def train(config: Config):
             optimizer, **config.scheduler["kwargs"]
         )
 
-    logger.info("Starting training.")
+    print("Starting training.")
     for epoch in range(num_epochs):
-        logger.info(f"Epoch {epoch}")
+        print(f"Epoch {epoch}")
 
         for batch_num, (x, cell_type, labels) in tqdm(enumerate(train_dataloader)):
             x = x.to(device)
@@ -237,26 +219,24 @@ def train(config: Config):
             if use_wandb:
                 wandb.log(wandb_log_info)
             else:
-                logger.info(wandb_log_info)
+                print(wandb_log_info)
 
         if config.use_scheduler:
             scheduler.step()
 
         torch.save(model.state_dict(), config.save_dir / f"{epoch}.pt")
 
-    logger.info("Training completed.")
+    print("Training completed.")
     metric_head_accuracy, cftn_head_accuracy = eval(model, test_dataloader)
 
     if use_wandb:
-        logger.info("Running eval on entire test set.")
+        print("Running eval on entire test set.")
         wandb.run.summary["full_test_accuracy:cftn_head"] = cftn_head_accuracy
         wandb.run.summary["full_test_accuracy:metric_head"] = metric_head_accuracy
         wandb.finish()
     else:
-        logger.info(f"full test set accuracy (ce loss head): {cftn_head_accuracy}")
-        logger.info(
-            f"full test set accuracy (metric loss head): {metric_head_accuracy}"
-        )
+        print(f"full test set accuracy (ce loss head): {cftn_head_accuracy}")
+        print(f"full test set accuracy (metric loss head): {metric_head_accuracy}")
 
     return
 
@@ -272,6 +252,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     config: Config = Config.load_config(args.config_path)
-    logger.info("Config loaded.")
-    logger.info(config)
+    print("Config loaded.")
+    print(config)
     train(config)
