@@ -2,6 +2,7 @@ import torch
 from torch import nn
 import torchvision
 from torch.nn import functional as F
+from typing import Literal
 
 
 # from .losses import ArcMarginProduct
@@ -27,6 +28,7 @@ class CustomVit(nn.Module):
             num_heads: 12,
             hidden_dim: 768,
             mlp_dim: 3072
+        see table 1.
         Feeds in cell embedding with the final mlp
         """
 
@@ -83,19 +85,22 @@ class CustomDensenet(nn.Module):
     def __init__(
         self,
         num_classes: int,
-        backbone="densenet121",
+        backbone: Literal[
+            "densenet121", "densenet169", "densenet201", "densenet161"
+        ] = "densenet121",
         embedding_size: int = 512,
         cell_embedding_dim: int = 12,
     ):
-        # cell type expected to have 4 classes
         super().__init__()
+        # cell type expected to have 4 classes
 
-        self.backbone = backbone  # 121 old
-        channels = 96 if backbone == "densenet161" else 64  # 121
-        first_conv = nn.Conv2d(6, channels, 7, 2, 3, bias=False)
+        self.backbone = backbone
+        channels = 96 if backbone == "densenet161" else 64
         pretrained_backbone = getattr(torchvision.models, backbone)(pretrained=True)
         self.features = pretrained_backbone.features
-        self.features.conv0 = first_conv  # replace first conv layer
+        self.features.conv0 = nn.Conv2d(
+            6, channels, 7, 2, 3, bias=False
+        )  # use 6 channel conv
         features_num = pretrained_backbone.classifier.in_features
 
         self.classes = num_classes

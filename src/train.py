@@ -31,7 +31,10 @@ def load_model(
     cell_embedding_dim: int = 12,
     image_size: int = 224,
 ):
+    """Convenience wrapper to load any model type."""
+
     if "densenet" in model_type:
+        # densenet121, densenet169, densenet201, densenet161
         model = CustomDensenet(
             backbone=model_type,
             num_classes=num_categories,
@@ -40,7 +43,10 @@ def load_model(
     else:
         # ViT
         model = CustomVit(
-            image_size=image_size, num_classes=num_categories, dropout=0.2
+            image_size=image_size,
+            num_classes=num_categories,
+            dropout=0.2,
+            cell_embedding_dim=cell_embedding_dim,
         )
 
     return model
@@ -82,6 +88,7 @@ def eval(model, test_dataloader):
 
 
 def setup_dataloader(config: Config, split: Literal["train", "test"]):
+    """Create Rxrx1 pytorch dataset and dataloader for train or test split."""
 
     if config.use_cutmix and split == "train":
         collate_fn = partial(cutmix_collate_fn, num_categories=config.num_categories)
@@ -97,12 +104,11 @@ def setup_dataloader(config: Config, split: Literal["train", "test"]):
             resize_dim=config.resize_img_dim, transform_list=[]
         )
 
-    # setup train/test datasets/dataloaders
-    print(f"Setting up {split} dataloaders.")
+    print(f"Setting up {split} dataset and dataloader.")
     rxrx1_dataset = Rxrx1(
         images_dir=config.images_dir,
         metadata_path=config.metadata_path,
-        split="train",
+        split=split,
         num_categories=config.num_categories,
         data_transform=transform_pipeline,
     )
@@ -190,6 +196,7 @@ def train(config: Config):
                 "loss": loss.item(),
                 "train_ce_loss": _ce_loss.item(),
                 "metric_loss": _metric_loss.item(),
+                "epoch": epoch,
                 # 'train_accuracy':train_accuracy,
             }
 
