@@ -186,6 +186,7 @@ def train(config: Config):
         )
 
     print("Starting training.")
+    save_epochs = set(list(range(0, num_epochs, num_epochs // 5)) + [num_epochs])
     for epoch in range(num_epochs):
         print(f"Epoch {epoch}")
 
@@ -251,7 +252,8 @@ def train(config: Config):
         if config.use_scheduler:
             scheduler.step()
 
-        torch.save(model.state_dict(), config.save_dir / f"{epoch}.pt")
+        if epoch in save_epochs:
+            torch.save(model.state_dict(), config.save_dir / f"{epoch}.pt")
 
     print("Training completed.")
     metric_head_accuracy, cftn_head_accuracy = eval(model, test_dataloader)

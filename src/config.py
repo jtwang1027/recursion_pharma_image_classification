@@ -8,7 +8,7 @@ from pydantic import (
 )
 from typing import Literal, List
 import yaml
-from typing import Optional
+from typing import Optional, Union
 from pathlib import Path
 import torch
 
@@ -28,9 +28,10 @@ class Config(BaseModel):
     data_augmentation: list[str] = (
         ["vertical", "horizontal", "rotate", "cutmix", "crop:224"],
     )
-    wandb: Optional[dict] = None
     arcface_loss: dict = {"s": 30, "m": 0.5}
+    wandb: Optional[dict] = None
     save_dir: str = "./model1_checkpoints/"
+    # save_model_version: Union[list, str] = ["best", "last"]
     scheduler: Optional[dict] = None
 
     @validator("loss_ce_weight")
@@ -41,12 +42,6 @@ class Config(BaseModel):
             raise ValueError(
                 "loss coefficient balances metric and cross-entropy loss. must be between 0-1"
             )
-
-    @validator("save_dir")
-    def validate_save_dir(cls, v):
-        save_path = Path(v)
-        save_path.mkdir(exist_ok=True, parents=True)
-        return save_path
 
     @validator("model")
     def check_model_type(cls, v):
@@ -172,3 +167,25 @@ class Config(BaseModel):
         with open(yaml_path, "r") as f:
             config_data = yaml.safe_load(f)
         return cls(**config_data)
+
+    # @validator("save_model_version")
+    # def validate_save_model_version(
+    #     cls, v: Union[str, list]
+    # ) -> List[Literal["best", "last", "all"]]:
+    #     """
+    #     Save model at:
+    #         all: every epoch
+    #         best: epoch with best test set accuracy
+    #         last: last epoch trained
+    #     """
+    #     if isinstance(v, str):
+    #         v = [v]
+
+    #     for item in v:
+    #         assert item in [
+    #             "all",
+    #             "best",  # based on test set
+    #             "last",
+    #         ], "Accepted `save_model_version` args: all, best, last"
+
+    #     return v
