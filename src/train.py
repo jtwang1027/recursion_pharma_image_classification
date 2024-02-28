@@ -84,6 +84,7 @@ def eval(model, test_dataloader):
     all_cftn_predictions = []
     all_metric_head_predictions = []
     all_labels = []
+    model.eval()
 
     for x, cell_type, labels in test_dataloader:
         x, cell_type, labels = x.to(device), cell_type.to(device), labels.to(device)
@@ -230,6 +231,7 @@ def train(config: Config):
             # EVAL
             if batch_num % 50 == 0:
                 with torch.no_grad():
+                    model.eval()
                     test_metric, test_cftn = model(test_x, test_cell_type)
                     test_accuracy = calc_accuracy(test_cftn, test_labels)
                     test_metric_accuracy = calc_accuracy(
@@ -245,6 +247,7 @@ def train(config: Config):
                         "test_ce_loss": test_ce_loss.item(),
                     }
                 )
+                model.train()
 
             if use_wandb:
                 wandb.log(wandb_log_info)
