@@ -1,3 +1,4 @@
+from __future__ import annotations
 from pydantic import (
     BaseModel,
     field_validator,
@@ -30,7 +31,7 @@ class Config(BaseModel):
     )
     arcface_loss: dict = {"s": 30, "m": 0.5}
     wandb: Optional[dict] = None
-    save_dir: str = "./model1_checkpoints/"
+    save_dir: DirectoryPath = "./model1_checkpoints/"
     # save_model_version: Union[list, str] = ["best", "last"]
     scheduler: Optional[dict] = None
 
@@ -150,6 +151,12 @@ class Config(BaseModel):
         else:
             raise FileNotFoundError(f"metadata_path does not exist: {v}")
 
+    @validator("save_dir")
+    def validate_save_dir(cls, v):
+        v = Path(v)
+        v.mkdir(exist_ok=True)
+        return v
+
     @property
     def use_cutmix(self) -> bool:
         return "cutmix" in self.data_augmentation
@@ -167,6 +174,16 @@ class Config(BaseModel):
         with open(yaml_path, "r") as f:
             config_data = yaml.safe_load(f)
         return cls(**config_data)
+
+    @staticmethod
+    def write_yaml(config: Config, yaml_path: str):
+        pathlib_fields = ["images_dir", "metadata_path", "save_dir"]
+        _config = dict(config)
+        for key in pathlib_fields:
+            _config[key] = str(config[key])
+
+        with open(yaml_path, "w") as yaml_file:
+            yaml.dump(_config, yaml_file)
 
     # @validator("save_model_version")
     # def validate_save_model_version(

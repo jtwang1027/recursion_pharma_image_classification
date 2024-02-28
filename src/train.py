@@ -144,6 +144,8 @@ def train(config: Config):
     use_wandb = config.use_wandb
     loss_ce_weight = config.loss_ce_weight
 
+    Config.write_yaml(config, config.save_dir / "config.yaml")
+
     # setup train/test datasets/dataloaders
     _, train_dataloader = setup_dataloader(config, "train")
     _, test_dataloader = setup_dataloader(config, "test")
