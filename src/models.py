@@ -2,7 +2,7 @@ import torch
 from torch import nn
 import torchvision
 from torch.nn import functional as F
-from typing import Literal, Optional
+from typing import Literal, Optional, Union
 
 
 from losses import ArcMarginProduct
@@ -85,40 +85,42 @@ class CustomVit(nn.Module):
         return self.arc_margin_product(x), self.heads(x)
 
 
+densenet_model_types = Literal[
+    "densenet121", "densenet169", "densenet201", "densenet161"
+]
+resnet_model_types = Literal["resnet34", "resnet50", "resnet101", "resnet152"]
+
+
 class CustomDensenet(nn.Module):
     def __init__(
         self,
         num_classes: int,
-        backbone: Literal[
-            "densenet121", "densenet169", "densenet201", "densenet161"
-        ] = "densenet121",
+        backbone: Union[densenet_model_types, resnet_model_types] = "densenet121",
         embedding_size: int = 512,
         cell_embedding_dim: int = 12,
     ):
         super().__init__()
         # cell type expected to have 4 classes
-
         self.backbone = backbone
-        channels = 96 if backbone == "densenet161" else 64
-        pretrained_backbone = getattr(torchvision.models, backbone)(pretrained=True)
-        self.features = pretrained_backbone.features
-        self.features.conv0 = nn.Conv2d(
-            6, channels, 7, 2, 3, bias=False
-        )  # use 6 channel conv
-        features_num = pretrained_backbone.classifier.in_features
+        if backbone.startwith("densenet"):
+            self._setup_densenet()
+        elif backbone.startwith("resnet"):
+            self._setup_resnet()
+        else:
+            raise ValueError(f"Unrecognized densenet/resnet model type: {backbone}")
 
         self.classes = num_classes
         self.embedding_size = embedding_size
         self.cell_embedding_dim = cell_embedding_dim
 
         if self.cell_embedding_dim > 0:
-            features_num += cell_embedding_dim
+            self.features_num += cell_embedding_dim
             self.cell_embedding = nn.Embedding(4, cell_embedding_dim)
 
         # neck
         self.neck = nn.Sequential(
-            nn.BatchNorm1d(features_num),
-            nn.Linear(features_num, self.embedding_size, bias=False),
+            nn.BatchNorm1d(self.features_num),
+            nn.Linear(self.features_num, self.embedding_size, bias=False),
             nn.ReLU(inplace=True),
             nn.BatchNorm1d(self.embedding_size),
             nn.Linear(self.embedding_size, self.embedding_size, bias=False),
@@ -151,3 +153,30 @@ class CustomDensenet(nn.Module):
         # return both the embedding & logits for classification
         embedding = self.embed(x, s)
         return self.arc_margin_product(embedding), self.classification(embedding)
+
+    def _setup_densenet(
+        self,
+        backbone: Literal[
+            "densenet121", "densenet169", "densenet201", "densenet161"
+        ] = "densenet121",
+    ):
+        channels = 96 if backbone == "densenet161" else 64
+        pretrained_backbone = getattr(torchvision.models, backbone)(pretrained=True)
+        self.features = pretrained_backbone.features
+        self.features.conv0 = nn.Conv2d(
+            6, channels, 7, 2, 3, bias=False
+        )  # use 6 channel conv
+        self.features_num = pretrained_backbone.classifier.in_features
+
+    def _setup_resnet(
+        self,
+        backbone: Literal[
+            "resnet34", "resnet50", "resnet101", "resnet152"
+        ] = "resnet34",
+    ):
+        pretrained_backbone = getattr(torchvision.models, backbone)(pretrained=True)
+        pretrained_backbone.conv1 = nn.Conv2d(
+            6, 64, 7, 2, 3, bias=False
+        )  # replace 1 st conv layer
+        self.features = list(pretrained_backbone.children())
+        self.features_num = pretrained_backbone.fc.in_features

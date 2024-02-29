@@ -16,13 +16,11 @@ import torch.nn.functional as F
 import argparse
 from typing import Literal
 
-
+# local
 from dataset import Rxrx1, make_transform_pipeline
 from config import Config
 from models import CustomDensenet, CustomVit
 from losses import ArcFaceLoss, calc_accuracy
-from torchvision.models import VisionTransformer, vit_b_16
-import torchvision
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else torch.device("cpu"))
 
@@ -36,7 +34,7 @@ def load_model(
 ):
     """Convenience wrapper to load any model type. kwargs are used for ViT from scratch."""
 
-    if "densenet" in model_type:
+    if model_type.startswith("densenet") or model_type.startswith("resnet"):
         # densenet121, densenet169, densenet201, densenet161
         model = CustomDensenet(
             backbone=model_type,
@@ -139,15 +137,10 @@ def setup_dataloader(config: Config, split: Literal["train", "test"]):
 
 
 def train(config: Config):
-    learning_rate = config.learning_rate
-    num_categories = config.num_categories
-    num_epochs = config.num_epochs
-    use_wandb = config.use_wandb
-    loss_ce_weight = config.loss_ce_weight
 
     Config.write_yaml(config, config.save_dir / "config.yaml")
 
-    # setup train/test datasets/dataloaders
+    # setup train/test dataloaders
     _, train_dataloader = setup_dataloader(config, "train")
     _, test_dataloader = setup_dataloader(config, "test")
 
@@ -179,7 +172,7 @@ def train(config: Config):
     model = model.to(device)
     model.train()
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate)
     metric_loss = ArcFaceLoss(**config.arcface_loss)
     ce_loss = nn.CrossEntropyLoss()
 
@@ -188,9 +181,10 @@ def train(config: Config):
             optimizer, **config.scheduler["kwargs"]
         )
 
+    best_epoch = None
+    best_test_accuracy = np.inf
     print("Starting training.")
-    save_epochs = set(list(range(0, num_epochs, num_epochs // 5)) + [num_epochs])
-    for epoch in range(num_epochs):
+    for epoch in range(config.num_epochs):
         print(f"Epoch {epoch}")
 
         for batch_num, (x, cell_type, labels) in tqdm(enumerate(train_dataloader)):
@@ -212,58 +206,67 @@ def train(config: Config):
                 )
 
             _ce_loss = ce_loss(pred_cftn, labels)
-            loss = loss_ce_weight * _ce_loss + (1 - loss_ce_weight) * _metric_loss
-
-            # train_accuracy = calc_accuracy(pred_cftn, labels) # can't calc accuracy using cutmix
+            loss = (
+                config.loss_ce_weight * _ce_loss
+                + (1 - config.loss_ce_weight) * _metric_loss
+            )
 
             wandb_log_info = {
                 "loss": loss.item(),
                 "train_ce_loss": _ce_loss.item(),
                 "metric_loss": _metric_loss.item(),
                 "epoch": epoch,
-                # 'train_accuracy':train_accuracy,
             }
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-            # EVAL
-            if batch_num % 50 == 0:
-                with torch.no_grad():
-                    model.eval()
-                    test_metric, test_cftn = model(test_x, test_cell_type)
-                    test_accuracy = calc_accuracy(test_cftn, test_labels)
-                    test_metric_accuracy = calc_accuracy(
-                        test_metric, test_labels
-                    )  # from metric loss head
-                    test_ce_loss = ce_loss(test_cftn, test_labels)
-
-                wandb_log_info.update(
-                    {
-                        # test set
-                        "test_accuracy": test_accuracy,
-                        "test_accuracy:metric_head": test_metric_accuracy,
-                        "test_ce_loss": test_ce_loss.item(),
-                    }
-                )
-                model.train()
-
-            if use_wandb:
+            if config.use_wandb and batch_num != len(train_dataloader):
                 wandb.log(wandb_log_info)
-            else:
-                print(wandb_log_info)
+
+        # EVAL at end of each epoch
+        with torch.no_grad():
+            model.eval()
+            test_metric, test_cftn = model(test_x, test_cell_type)
+            test_accuracy = calc_accuracy(test_cftn, test_labels)
+            test_metric_accuracy = calc_accuracy(
+                test_metric, test_labels
+            )  # from metric loss head
+            test_ce_loss = ce_loss(test_cftn, test_labels)
+
+            wandb_log_info.update(
+                {
+                    # test set
+                    "test_accuracy": test_accuracy,
+                    "test_accuracy:metric_head": test_metric_accuracy,
+                    "test_ce_loss": test_ce_loss.item(),
+                }
+            )
+            model.train()
+
+        if config.use_wandb:
+            wandb.log(wandb_log_info)
+        else:
+            print(wandb_log_info)
 
         if config.use_scheduler:
             scheduler.step()
 
-        if epoch in save_epochs:
+        if test_accuracy >= best_test_accuracy:
+            print(f"New best model on epoch: {epoch}.")
+            best_test_accuracy = test_accuracy
             torch.save(model.state_dict(), config.save_dir / f"{epoch}.pt")
+
+            if best_epoch is not None:
+                prev_model_path = config.save_dir / f"{best_epoch}.pt"
+                prev_model_path.unlink()
+            best_epoch = epoch
 
     print("Training completed.")
     metric_head_accuracy, cftn_head_accuracy = eval(model, test_dataloader)
 
-    if use_wandb:
+    if config.use_wandb:
         print("Running eval on entire test set.")
         wandb.run.summary["full_test_accuracy:cftn_head"] = cftn_head_accuracy
         wandb.run.summary["full_test_accuracy:metric_head"] = metric_head_accuracy
@@ -272,7 +275,7 @@ def train(config: Config):
         print(f"full test set accuracy (ce loss head): {cftn_head_accuracy}")
         print(f"full test set accuracy (metric loss head): {metric_head_accuracy}")
 
-    return
+    return model
 
 
 if __name__ == "__main__":
@@ -282,7 +285,7 @@ if __name__ == "__main__":
         type=str,
         default="example_config.yaml",
         help="local path to config.yaml",
-    )  # , required=True)
+    )
 
     args = parser.parse_args()
     config: Config = Config.load_config(args.config_path)
