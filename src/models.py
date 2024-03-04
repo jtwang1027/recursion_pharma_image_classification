@@ -102,9 +102,9 @@ class CustomDensenet(nn.Module):
         super().__init__()
         # cell type expected to have 4 classes
         self.backbone = backbone
-        if backbone.startwith("densenet"):
+        if backbone.startswith("densenet"):
             self._setup_densenet()
-        elif backbone.startwith("resnet"):
+        elif backbone.startswith("resnet"):
             self._setup_resnet()
         else:
             raise ValueError(f"Unrecognized densenet/resnet model type: {backbone}")
@@ -178,5 +178,6 @@ class CustomDensenet(nn.Module):
         pretrained_backbone.conv1 = nn.Conv2d(
             6, 64, 7, 2, 3, bias=False
         )  # replace 1 st conv layer
-        self.features = list(pretrained_backbone.children())
+
+        self.features = nn.Sequential(*list(pretrained_backbone.children())[:-2])
         self.features_num = pretrained_backbone.fc.in_features

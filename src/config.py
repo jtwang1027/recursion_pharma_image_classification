@@ -31,8 +31,7 @@ class Config(BaseModel):
     )
     arcface_loss: dict = {"s": 30, "m": 0.5}
     wandb: Optional[dict] = None
-    save_dir: DirectoryPath = "./model1_checkpoints/"
-    # save_model_version: Union[list, str] = ["best", "last"]
+    save_dir: str = "./model1_checkpoints/"
     scheduler: Optional[dict] = None
 
     @validator("loss_ce_weight")
@@ -70,6 +69,10 @@ class Config(BaseModel):
                 "densenet201",
                 "densenet161",
             ]
+
+        elif model_type.startswith("resnet"):
+            assert model_type in ["resnet34", "resnet50", "resnet101", "resnet152"]
+
         elif model_type == "vit":
             assert (
                 "kwargs" in v
@@ -154,7 +157,7 @@ class Config(BaseModel):
     @validator("save_dir")
     def validate_save_dir(cls, v):
         v = Path(v)
-        v.mkdir(exist_ok=True)
+        v.mkdir(parents=True, exist_ok=True)
         return v
 
     @property
@@ -180,7 +183,7 @@ class Config(BaseModel):
         pathlib_fields = ["images_dir", "metadata_path", "save_dir"]
         _config = dict(config)
         for key in pathlib_fields:
-            _config[key] = str(config[key])
+            _config[key] = str(_config[key])
 
         with open(yaml_path, "w") as yaml_file:
             yaml.dump(_config, yaml_file)

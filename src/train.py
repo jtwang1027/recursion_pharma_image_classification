@@ -182,7 +182,7 @@ def train(config: Config):
         )
 
     best_epoch = None
-    best_test_accuracy = np.inf
+    best_test_accuracy = -np.inf
     print("Starting training.")
     for epoch in range(config.num_epochs):
         print(f"Epoch {epoch}")
