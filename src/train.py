@@ -202,7 +202,9 @@ def train(config: Config):
             else:
                 _metric_loss = metric_loss(
                     pred_embedding_metric,
-                    F.one_hot(labels, num_classes=config.num_categories),
+                    F.one_hot(labels, num_classes=config.num_categories).to(
+                        torch.float
+                    ),
                 )
 
             _ce_loss = ce_loss(pred_cftn, labels)
